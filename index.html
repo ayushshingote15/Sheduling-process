@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CPU Scheduling Simulator</title>
+<style>
+:root{--bg:#fafaf9;--card:#fff;--ink:#1c1c1a;--mut:#6b6b66;--line:#e5e4e0;--acc:#2f4fd8;--accbg:#eef1fd;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--card:#1c1c1a;--ink:#ecebe6;--mut:#9a9992;--line:#2e2d2a;--acc:#8ea2ff;--accbg:#22264a}}
+:root[data-theme="dark"]{--bg:#141413;--card:#1c1c1a;--ink:#ecebe6;--mut:#9a9992;--line:#2e2d2a;--acc:#8ea2ff;--accbg:#22264a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:32px 20px 56px}
+h1{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mut);margin:0 0 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:500;color:var(--mut);text-align:left;padding:4px 6px}
+td{padding:3px 4px}
+.res td,.res th{padding:7px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.res th{border-top:0}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.dim{opacity:.4}
+button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--mut)}
+button.x{border:0;color:var(--mut);padding:4px 8px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end}
+.lbl{font-size:12px;color:var(--mut);margin-bottom:6px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--card)}
+.seg button.on{background:var(--accbg);color:var(--acc);font-weight:600}
+.err{color:#c0392b;margin:0}
+.hint{color:var(--mut);font-size:13px;margin:10px 0 0}
+.bar{position:relative;display:flex;height:46px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg)}
+.bar>div{position:relative;border-right:1px solid var(--bg);min-width:0}
+.bar i{position:absolute;inset:0 auto 0 0}
+.bar span{position:relative;display:flex;height:100%;align-items:center;justify-content:center;font-weight:600}
+.bar .idle{color:var(--mut);font-weight:400;font-size:12px}
+.bar u{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);z-index:2}
+.ticks{position:relative;height:20px;margin-top:4px;font-size:11px;color:var(--mut)}
+.ticks b{position:absolute;font-weight:400;transform:translateX(-50%)}
+.ctl{display:flex;gap:12px;align-items:center;margin-top:10px}
+.ctl input{padding:0}
+.lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.lane{border:1px solid var(--line);border-radius:8px;padding:10px;min-height:96px}
+.lane h3{font-size:12px;font-weight:500;color:var(--mut);margin:0 0 8px}
+.lane h4{font-size:11px;font-weight:500;color:var(--mut);margin:8px 0 4px}
+.chip{display:inline-flex;align-items:baseline;gap:6px;margin:0 6px 6px 0;padding:3px 9px;border-radius:14px;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.chip small{color:var(--mut);font-size:11px}
+.chip.next{box-shadow:0 0 0 2px var(--acc)}
+.note{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:var(--accbg);font-size:13px}
+.cap{margin:14px 0 0}
+.bars{display:grid;gap:8px;margin-top:6px}
+.b{display:grid;grid-template-columns:130px 1fr 40px;gap:10px;align-items:center;font-size:13px}
+.b div{height:12px;border-radius:3px;background:var(--acc);opacity:.85}
+.scroll{overflow-x:auto}
+@media (max-width:560px){.b{grid-template-columns:96px 1fr 36px}}
+</style></head>
+<body><div id="root"></div>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+const {useState,useMemo,useEffect}=React;
+const h=htm.bind(React.createElement);
+const QN=['High','Medium','Low'];
+const COL=['#4f6bed','#d9822b','#2e9e83','#c0508a','#7a6bd1','#b59a1f','#3b8fb8','#c25b4a'];
+const col=i=>COL[i%8];
+const fmt=x=>Number.isInteger(x)?String(x):x.toFixed(2);
+const org=(p,a)=>a==='prio'?p.pr:p.q;
+const eff=(p,w,a,g,T)=>Math.max(a==='prio'?1:0,org(p,a)-(g?Math.floor(w/T):0));
+const SAMPLE=[['P1',0,3,1,0],['P2',1,4,5,2],['P3',2,3,1,0],['P4',3,3,1,0],['P5',4,2,2,1],['P6',6,3,1,0]]
+  .map(([id,at,bt,pr,q])=>({id,at:String(at),bt:String(bt),pr:String(pr),q:String(q)}));
+
+function parse(rows){
+  const ids=new Set(),ps=[];
+  for(const [i,r] of rows.entries()){
+    const id=r.id.trim(),n=x=>x.trim()===''?NaN:Number(x);
+    const at=n(r.at),bt=n(r.bt),pr=n(r.pr);
+    if(!id)return{err:`Row ${i+1}: PID is required.`};
+    if(ids.has(id))return{err:`Row ${i+1}: PID “${id}” is already used.`};
+    if(!(at>=0))return{err:`${id}: arrival time must be 0 or more.`};
+    if(!(bt>0))return{err:`${id}: burst time must be greater than 0.`};
+    if(!Number.isInteger(pr)||pr<1)return{err:`${id}: priority must be a whole number, 1 or higher.`};
+    ids.add(id);ps.push({id,at,bt,pr,q:+r.q,i});
+  }
+  return ps.length?{ps}:{err:'Add at least one process.'};
+}
+
+function simulate(ps,a,g,T){
+  let t=0;const st={},segs=[];
+  while(Object.keys(st).length<ps.length){
+    const left=ps.filter(p=>st[p.id]===undefined);
+    const rdy=left.filter(p=>p.at<=t);
+    if(!rdy.length){const nx=Math.min(...left.map(p=>p.at));segs.push({id:null,s:t,e:nx});t=nx;continue}
+    rdy.sort((x,y)=>eff(x,t-x.at,a,g,T)-eff(y,t-y.at,a,g,T)||x.at-y.at||x.i-y.i);
+    const p=rdy[0];st[p.id]=t;segs.push({id:p.id,s:t,e:t+p.bt});t+=p.bt;
+  }
+  const rows=ps.map(p=>{const s=st[p.id],ct=s+p.bt,tat=ct-p.at;return{id:p.id,s,ct,tat,wt:tat-p.bt,rt:s-p.at}}).sort((x,y)=>x.s-y.s);
+  const av=k=>rows.reduce((s,r)=>s+r[k],0)/rows.length;
+  const mx=rows.reduce((m,r)=>r.wt>m.wt?r:m,rows[0]);
+  const end=t,busy=ps.reduce((s,p)=>s+p.bt,0);
+  return{segs,rows,end,wt:av('wt'),tat:av('tat'),rt:av('rt'),maxWT:mx.wt,maxWho:mx.id,thr:ps.length/end,util:busy/end*100};
+}
+
+const Seg=({opts,val,on})=>h`<div class="seg">${opts.map(([v,l])=>h`<button key=${v} class=${val===v?'on':''} onClick=${()=>on(v)}>${l}</button>`)}</div>`;
+const Chip=({p,sub,next})=>h`<span class=${'chip'+(next?' next':'')} style=${{'--c':col(p.i)}}><b>${p.id}</b><small>${sub}</small></span>`;
+
+function Sim({ps,res,a,g,T,t,setT,play,setPlay}){
+  const {segs,end,rows}=res;
+  const start=Object.fromEntries(rows.map(r=>[r.id,r.s]));
+  const state=p=>p.at>t?'in':t>=start[p.id]+p.bt?'done':t>=start[p.id]?'run':'ready';
+  const E=p=>eff(p,t-p.at,a,g,T);
+  const ready=ps.filter(p=>state(p)==='ready').sort((x,y)=>E(x)-E(y)||x.at-y.at||x.i-y.i);
+  const run=ps.find(p=>state(p)==='run');
+  const lab=(p,v)=>a==='prio'?`priority ${v}`:`${QN[v]} queue`;
+  const sub=p=>{const e=E(p),o=org(p,a);return a==='prio'?(e<o?`prio ${o} → ${e}`:`prio ${o}`):(e<o?`${QN[o]} → ${QN[e]}`:QN[o])};
+  const boosted=ready.filter(p=>E(p)<org(p,a));
+  const cap=t>=end?`All processes finished at t = ${fmt(end)}.`:run?`${run.id} is on the CPU from t = ${fmt(start[run.id])} to t = ${fmt(start[run.id]+run.bt)}.`:'The CPU is idle: nothing has arrived yet.';
+  const ticks=[0,...segs.map(s=>s.e)];
+  const withAvg=['wt','tat','rt'];
+  return h`<div>
+    <div class="card"><h2>Timeline</h2>
+      <div class="bar">${segs.map((s,k)=>h`<div key=${k} style=${{flex:s.e-s.s}}>${s.id?h`<i style=${{width:Math.max(0,Math.min(1,(t-s.s)/(s.e-s.s)))*100+'%',background:`color-mix(in srgb,${col(ps.find(p=>p.id===s.id).i)} 45%,transparent)`}}></i><span>${s.id}</span>`:h`<span class="idle">idle</span>`}</div>`)}<u style=${{left:`calc(${t/end*100}% - 1px)`}}></u></div>
+      <div class="ticks">${ticks.map((x,k)=>h`<b key=${k} style=${{left:x/end*100+'%'}}>${fmt(x)}</b>`)}</div>
+      <div class="ctl">
+        <button class="pri" onClick=${()=>{if(play)setPlay(false);else{if(t>=end)setT(0);setPlay(true)}}}>${play?'Pause':'Play'}</button>
+        <button onClick=${()=>{setPlay(false);setT(Math.max(0,t-1))}}>Back</button>
+        <button onClick=${()=>{setPlay(false);setT(Math.min(end,t+1))}}>Step</button>
+        <input type="range" min="0" max=${end} step="1" value=${t} onInput=${e=>{setPlay(false);setT(+e.target.value)}} aria-label="Time"/>
+        <span style=${{minWidth:56,textAlign:'right'}}>t = ${fmt(t)}</span>
+      </div>
+      <p class="cap">${cap}</p>
+      ${boosted.map(p=>h`<p class="note" key=${p.id}><b>${p.id}</b> has waited ${fmt(t-p.at)} time units, so aging moved it from ${lab(p,org(p,a))} to ${lab(p,E(p))}.</p>`)}
+    </div>
+    <div class="card"><h2>What the scheduler sees at t = ${fmt(t)}</h2>
+      <div class="lanes">
+        <div class="lane"><h3>Not yet arrived</h3>${ps.filter(p=>state(p)==='in').map(p=>h`<${Chip} key=${p.id} p=${p} sub=${'at '+fmt(p.at)}/>`)}</div>
+        <div class="lane"><h3>Ready queue${a==='prio'?' (best first)':''}</h3>
+          ${a==='prio'?ready.map((p,k)=>h`<${Chip} key=${p.id} p=${p} sub=${sub(p)} next=${k===0}/>`)
+          :QN.map((n,q)=>h`<div key=${n}><h4>${n}</h4>${ready.filter(p=>E(p)===q).map(p=>h`<${Chip} key=${p.id} p=${p} sub=${sub(p)} next=${p===ready[0]}/>`)}</div>`)}
+          ${ready.length?h`<p class="hint">Outlined process is picked next.</p>`:null}</div>
+        <div class="lane"><h3>CPU</h3>${run?h`<${Chip} p=${run} sub=${'burst '+fmt(run.bt)}/>`:null}</div>
+        <div class="lane"><h3>Completed</h3>${ps.filter(p=>state(p)==='done').map(p=>h`<${Chip} key=${p.id} p=${p} sub=${'at '+fmt(start[p.id]+p.bt)}/>`)}</div>
+      </div>
+    </div>
+    <div class="card scroll"><h2>Results</h2>
+      <table class="res"><thead><tr><th>PID</th><th>Start</th><th>Completion</th><th>Waiting</th><th>Turnaround</th><th>Response</th></tr></thead>
+      <tbody>${rows.map(r=>h`<tr key=${r.id}><td>${r.id}</td><td>${fmt(r.s)}</td><td>${fmt(r.ct)}</td><td>${fmt(r.wt)}</td><td>${fmt(r.tat)}</td><td>${fmt(r.rt)}</td></tr>`)}
+      <tr><td><b>Average</b></td><td></td><td></td>${withAvg.map(k=>h`<td key=${k}><b>${fmt(+res[k].toFixed(2))}</b></td>`)}</tr></tbody></table>
+      <p class="hint">Throughput ${res.thr.toFixed(2)} processes per time unit · CPU utilisation ${res.util.toFixed(0)}%</p>
+    </div></div>`;
+}
+
+function Compare({ps,T}){
+  const R=[['prio',false,'Priority'],['prio',true,'Priority + aging'],['mlq',false,'MLQ'],['mlq',true,'MLQ + aging']]
+    .map(([a,g,l])=>({l,r:simulate(ps,a,g,T)}));
+  const bars=(k,title)=>{const m=Math.max(...R.map(x=>x.r[k]))||1;
+    return h`<div><div class="lbl">${title}</div><div class="bars">${R.map(x=>h`<div class="b" key=${x.l}><span>${x.l}</span><div style=${{width:x.r[k]/m*100+'%'}}></div><span>${fmt(+x.r[k].toFixed(2))}</span></div>`)}</div></div>`};
+  return h`<div>
+    <div class="card scroll"><h2>Same processes, four policies</h2>
+      <table class="res"><thead><tr><th>Policy</th><th>Avg WT</th><th>Avg TAT</th><th>Avg RT</th><th>Max WT</th><th>Throughput</th><th>CPU util.</th></tr></thead>
+      <tbody>${R.map(({l,r})=>h`<tr key=${l}><td>${l}</td><td>${fmt(+r.wt.toFixed(2))}</td><td>${fmt(+r.tat.toFixed(2))}</td><td>${fmt(+r.rt.toFixed(2))}</td><td>${fmt(r.maxWT)} (${r.maxWho})</td><td>${r.thr.toFixed(2)}</td><td>${r.util.toFixed(0)}%</td></tr>`)}</tbody></table>
+    </div>
+    <div class="card"><div class="row" style=${{alignItems:'flex-start'}}><div style=${{flex:'1 1 320px'}}>${bars('wt','Average waiting time')}</div><div style=${{flex:'1 1 320px'}}>${bars('maxWT','Longest wait of any process')}</div></div>
+      <p class="hint">No policy wins on every measure. Aging usually trims the longest wait, and may raise the average slightly, depending on the arrival pattern, bursts and priorities you enter.</p></div>
+  </div>`;
+}
+
+function App(){
+  const [rows,setRows]=useState(SAMPLE),[a,setA]=useState('prio'),[g,setG]=useState(false),[T,setT_]=useState('2'),[tab,setTab]=useState('sim'),[t,setT]=useState(0),[play,setPlay]=useState(false);
+  const pr=useMemo(()=>{const r=parse(rows);if(r.err)return r;return Number(T)>=1?r:{err:'Aging threshold must be 1 or more.'}},[rows,T]);
+  const res=useMemo(()=>pr.err?null:simulate(pr.ps,a,g,Number(T)),[pr,a,g,T]);
+  const end=res?res.end:0;
+  useEffect(()=>{setT(0);setPlay(false)},[rows,a,g,T]);
+  useEffect(()=>{if(!play)return;const id=setInterval(()=>setT(x=>{if(x>=end){setPlay(false);return x}return Math.min(end,x+1)}),500);return()=>clearInterval(id)},[play,end]);
+  const set=(i,k,v)=>setRows(rs=>rs.map((r,j)=>j===i?{...r,[k]:v}:r));
+  const inp=(r,i,k,w)=>h`<td style=${{width:w}}><input value=${r[k]} onInput=${e=>set(i,k,e.target.value)} inputmode=${k==='id'?'text':'decimal'} aria-label=${k}/></td>`;
+  return h`<div class="wrap">
+    <h1>CPU Scheduling Simulator</h1>
+    <p class="sub">Multilevel Queue and Priority scheduling, with an optional aging rule to prevent starvation.</p>
+    <div class="card scroll"><h2>Processes</h2>
+      <table><thead><tr><th>PID</th><th>Arrival</th><th>Burst</th><th class=${a==='mlq'?'dim':''}>Priority</th><th class=${a==='prio'?'dim':''}>Queue</th><th></th></tr></thead>
+      <tbody>${rows.map((r,i)=>h`<tr key=${i}>${inp(r,i,'id','18%')}${inp(r,i,'at','16%')}${inp(r,i,'bt','16%')}
+        <td class=${a==='mlq'?'dim':''} style=${{width:'16%'}}><input value=${r.pr} onInput=${e=>set(i,'pr',e.target.value)} inputmode="numeric" aria-label="priority"/></td>
+        <td class=${a==='prio'?'dim':''}><select value=${r.q} onChange=${e=>set(i,'q',e.target.value)}>${QN.map((n,q)=>h`<option key=${q} value=${q}>${n}</option>`)}</select></td>
+        <td style=${{width:36}}><button class="x" onClick=${()=>setRows(rs=>rs.filter((_,j)=>j!==i))} aria-label="Remove">×</button></td></tr>`)}</tbody></table>
+      <div class="row" style=${{marginTop:12,gap:8}}>
+        <button onClick=${()=>setRows(rs=>[...rs,{id:'P'+(rs.length+1),at:'0',bt:'1',pr:'1',q:'0'}])}>Add process</button>
+        <button onClick=${()=>setRows(SAMPLE)}>Load sample</button>
+        <button onClick=${()=>setRows([])}>Clear</button></div>
+      <p class="hint">A lower priority number means higher priority. Priority mode ignores the Queue column; MLQ mode ignores Priority.</p>
+    </div>
+    <div class="card"><h2>Scheduler</h2><div class="row">
+      <div><div class="lbl">Algorithm</div><${Seg} opts=${[['prio','Priority'],['mlq','Multilevel Queue']]} val=${a} on=${setA}/></div>
+      <div><div class="lbl">Mode</div><${Seg} opts=${[['t','Traditional'],['g','With aging']]} val=${g?'g':'t'} on=${v=>setG(v==='g')}/></div>
+      ${g?h`<div style=${{width:150}}><div class="lbl">Aging threshold (time units)</div><input value=${T} onInput=${e=>setT_(e.target.value)} inputmode="numeric"/></div>`:null}
+    </div>
+    <p class="hint">${g?(a==='prio'?'Every full threshold a process waits lifts its priority number by one step (never below 1).':'Every full threshold a process waits moves it up one queue (never above High).'):'Fixed priorities. Processes keep their original priority or queue until they run.'} Scheduling is non-preemptive.</p></div>
+    ${pr.err?h`<div class="card"><p class="err">${pr.err}</p></div>`:h`<div>
+      <div style=${{margin:'0 0 16px'}}><${Seg} opts=${[['sim','Simulation'],['cmp','Comparison']]} val=${tab} on=${setTab}/></div>
+      ${tab==='sim'?h`<${Sim} ps=${pr.ps} res=${res} a=${a} g=${g} T=${Number(T)} t=${t} setT=${setT} play=${play} setPlay=${setPlay}/>`:h`<${Compare} ps=${pr.ps} T=${Number(T)}/>`}</div>`}
+  </div>`;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h`<${App}/>`);
+</script></body></html>
